@@ -45,7 +45,7 @@ export default function ListingDetail() {
   if (!listing) return null;
 
   const photos = listing.photos || [];
-  const whatsappMessage = encodeURIComponent(`Hi, I am interested in "${listing.title}" (KSh ${formatPrice(listing.price)}/mo) on Webazi Homes.`);
+  const whatsappMessage = encodeURIComponent(`Hi, I am interested in "${listing.title}" (KSh ${formatPrice(listing.price)}/mo) on House Hunter.`);
 
   return (
     <div className="mx-auto max-w-3xl px-5 pb-24">
