@@ -1,38 +1,84 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import ListingCard from '../components/ListingCard';
+import ListingsMap from '../components/ListingsMap';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
+
+const COUNTIES = [
+  "Nairobi", "Kiambu",
+  "Mombasa","Kwale","Kilifi","Tana River","Lamu","Taita-Taveta","Garissa","Wajir","Mandera",
+  "Marsabit","Isiolo","Meru","Tharaka-Nithi","Embu","Kitui","Machakos","Makueni","Nyandarua",
+  "Nyeri","Kirinyaga","Murang'a","Turkana","West Pokot","Samburu","Trans Nzoia",
+  "Uasin Gishu","Elgeyo-Marakwet","Nandi","Baringo","Laikipia","Nakuru","Narok","Kajiado",
+  "Kericho","Bomet","Kakamega","Vihiga","Bungoma","Busia","Siaya","Kisumu","Homa Bay",
+  "Migori","Kisii","Nyamira"
+];
+
+const COUNTY_CONSTITUENCIES = {
+  Nairobi: [
+    "Westlands", "Dagoretti North", "Dagoretti South", "Langata", "Kibra", "Roysambu",
+    "Kasarani", "Ruaraka", "Embakasi South", "Embakasi North", "Embakasi Central",
+    "Embakasi East", "Embakasi West", "Makadara", "Kamukunji", "Starehe", "Mathare"
+  ],
+  Kiambu: [
+    "Gatundu South", "Gatundu North", "Juja", "Thika Town", "Ruiru", "Githunguri",
+    "Kiambu", "Kiambaa", "Kabete", "Kikuyu", "Limuru", "Lari"
+  ],
+};
+
+const ESTATE_CONSTITUENCY = {
+  "Westlands": "Westlands",
+  "Kilimani": "Dagoretti North",
+  "Kileleshwa": "Dagoretti North",
+  "Lavington": "Dagoretti North",
+};
 
 const ESTATES = ['All', 'Westlands', 'Kilimani', 'Kileleshwa', 'Lavington'];
 
 export default function Home() {
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [status, setStatus] = useState('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [selectedCounty, setSelectedCounty] = useState('Nairobi');
+  const [selectedConstituency, setSelectedConstituency] = useState('All');
   const [activeEstate, setActiveEstate] = useState('All');
 
-  const fetchListings = useCallback(async (estate) => {
+  const fetchListings = useCallback(async () => {
     setStatus('loading');
     try {
-      const filters = estate && estate !== 'All' ? { estate } : {};
+      const filters = activeEstate && activeEstate !== 'All' ? { estate: activeEstate } : {};
       const data = await api.getListings(filters);
-      setListings(data);
       setStatus('success');
+      setListings(data);
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : 'Failed to load listings.');
       setStatus('error');
     }
-  }, []);
+  }, [activeEstate]);
 
   useEffect(() => {
-    fetchListings(activeEstate);
-  }, [activeEstate, fetchListings]);
+    fetchListings();
+  }, [fetchListings]);
+
+  const visibleListings = listings.filter((l) => {
+    if (selectedConstituency !== 'All' && ESTATE_CONSTITUENCY[l.estate] !== selectedConstituency) return false;
+    return true;
+  });
+
+  const handleCountyChange = (county) => {
+    setSelectedCounty(county);
+    setSelectedConstituency('All');
+  };
+
+  const constituencyOptions = COUNTY_CONSTITUENCIES[selectedCounty] || [];
 
   return (
     <div className="mx-auto max-w-5xl px-5 pb-24">
       <section className="py-14 text-center sm:py-20">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-jade">Nairobi rentals</p>
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-jade">Nairobi &amp; Kiambu rentals</p>
         <h1 className="mt-4 font-display text-4xl font-semibold leading-tight text-ink sm:text-5xl">
           Every listing, walked and confirmed.
         </h1>
@@ -41,6 +87,37 @@ export default function Home() {
           spoken to the landlord ourselves.
         </p>
       </section>
+
+      <div className="mb-7 rounded-2xl border border-ink/10 bg-white/50 p-5">
+        <span className="mb-2 block font-mono text-xs uppercase tracking-wide text-inkSoft">
+          Find rentals near you
+        </span>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <select
+            value={selectedCounty}
+            onChange={(e) => handleCountyChange(e.target.value)}
+            className="w-full rounded-lg border border-ink/20 bg-white px-3 py-2.5 text-sm text-ink"
+          >
+            {COUNTIES.map((c) => (
+              <option key={c} value={c}>{c} County</option>
+            ))}
+          </select>
+          <select
+            value={selectedConstituency}
+            onChange={(e) => setSelectedConstituency(e.target.value)}
+            disabled={constituencyOptions.length === 0}
+            className="w-full rounded-lg border border-ink/20 bg-white px-3 py-2.5 text-sm text-ink disabled:opacity-50"
+          >
+            <option value="All">All constituencies</option>
+            {constituencyOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Constituency data from IEBC. Piloting in Nairobi &amp; Kiambu — growing area by area.
+        </p>
+      </div>
 
       <div className="mb-8 flex flex-wrap justify-center gap-2">
         {ESTATES.map((estate) => (
@@ -58,22 +135,24 @@ export default function Home() {
         ))}
       </div>
 
+      <ListingsMap listings={visibleListings} onSelect={(l) => navigate(`/listings/${l.id}`)} />
+
       {status === 'loading' && <LoadingState label="Finding listings…" />}
 
-      {status === 'error' && <ErrorState message={errorMessage} onRetry={() => fetchListings(activeEstate)} />}
+      {status === 'error' && <ErrorState message={errorMessage} onRetry={fetchListings} />}
 
-      {status === 'success' && listings.length === 0 && (
+      {status === 'success' && visibleListings.length === 0 && (
         <div className="py-16 text-center">
           <p className="font-display text-lg text-ink">No listings here yet</p>
           <p className="mt-2 text-sm text-inkSoft">
-            We are still walking this area. Check back soon, or try another estate above.
+            We are adding areas one at a time. Check back soon, or try another estate or constituency above.
           </p>
         </div>
       )}
 
-      {status === 'success' && listings.length > 0 && (
+      {status === 'success' && visibleListings.length > 0 && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map((listing) => (
+          {visibleListings.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))}
         </div>
