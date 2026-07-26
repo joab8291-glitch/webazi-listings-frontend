@@ -8,6 +8,10 @@ function formatPrice(price) {
   return new Intl.NumberFormat('en-KE').format(price);
 }
 
+function formatDate(dateString) {
+  return new Date(dateString).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function ListingDetail() {
   const { id } = useParams();
   const [listing, setListing] = useState(null);
@@ -91,6 +95,12 @@ export default function ListingDetail() {
           </span>
         )}
       </div>
+
+      {listing.verified && listing.updated_at && (
+        <p className="mt-2 font-mono text-xs text-jade">
+          Personally verified on {formatDate(listing.updated_at)}
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <span className="font-mono text-xl font-medium text-ochreDark">

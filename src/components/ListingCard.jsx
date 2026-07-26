@@ -4,6 +4,10 @@ function formatPrice(price) {
   return new Intl.NumberFormat('en-KE').format(price);
 }
 
+function formatDate(dateString) {
+  return new Date(dateString).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function ListingCard({ listing }) {
   const cover = listing.photos?.find((p) => p.is_cover) || listing.photos?.[0];
 
@@ -61,6 +65,11 @@ export default function ListingCard({ listing }) {
             {listing.bedrooms} bd · {listing.bathrooms} ba
           </span>
         </div>
+        {listing.verified && listing.updated_at && (
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-jade">
+            Verified {formatDate(listing.updated_at)}
+          </p>
+        )}
       </div>
     </Link>
   );

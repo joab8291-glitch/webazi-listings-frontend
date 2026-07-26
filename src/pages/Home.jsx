@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import ListingCard from '../components/ListingCard';
@@ -37,6 +37,12 @@ const ESTATE_CONSTITUENCY = {
 
 const ESTATES = ['All', 'Westlands', 'Kilimani', 'Kileleshwa', 'Lavington'];
 
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+];
+
 export default function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
@@ -45,6 +51,8 @@ export default function Home() {
   const [selectedCounty, setSelectedCounty] = useState('Nairobi');
   const [selectedConstituency, setSelectedConstituency] = useState('All');
   const [activeEstate, setActiveEstate] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const fetchListings = useCallback(async () => {
     setStatus('loading');
@@ -63,10 +71,25 @@ export default function Home() {
     fetchListings();
   }, [fetchListings]);
 
-  const visibleListings = listings.filter((l) => {
-    if (selectedConstituency !== 'All' && ESTATE_CONSTITUENCY[l.estate] !== selectedConstituency) return false;
-    return true;
-  });
+  const visibleListings = useMemo(() => {
+    let result = listings.filter((l) => {
+      if (selectedConstituency !== 'All' && ESTATE_CONSTITUENCY[l.estate] !== selectedConstituency) return false;
+      if (searchTerm.trim()) {
+        const term = searchTerm.trim().toLowerCase();
+        const haystack = `${l.title} ${l.estate} ${l.description || ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+
+    result = [...result].sort((a, b) => {
+      if (sortBy === 'price_asc') return a.price - b.price;
+      if (sortBy === 'price_desc') return b.price - a.price;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    return result;
+  }, [listings, selectedConstituency, searchTerm, sortBy]);
 
   const handleCountyChange = (county) => {
     setSelectedCounty(county);
@@ -87,6 +110,16 @@ export default function Home() {
           spoken to the landlord ourselves.
         </p>
       </section>
+
+      <div className="mb-5">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by name, estate, or keyword…"
+          className="w-full rounded-full border border-ink/20 bg-white px-5 py-3 text-sm text-ink outline-none focus:border-jade"
+        />
+      </div>
 
       <div className="mb-7 rounded-2xl border border-ink/10 bg-white/50 p-5">
         <span className="mb-2 block font-mono text-xs uppercase tracking-wide text-inkSoft">
@@ -119,20 +152,32 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="mb-8 flex flex-wrap justify-center gap-2">
-        {ESTATES.map((estate) => (
-          <button
-            key={estate}
-            onClick={() => setActiveEstate(estate)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
-              activeEstate === estate
-                ? 'border-jade bg-jade text-paper'
-                : 'border-ink/15 text-inkSoft hover:border-jade/40'
-            }`}
-          >
-            {estate}
-          </button>
-        ))}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {ESTATES.map((estate) => (
+            <button
+              key={estate}
+              onClick={() => setActiveEstate(estate)}
+              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                activeEstate === estate
+                  ? 'border-jade bg-jade text-paper'
+                  : 'border-ink/15 text-inkSoft hover:border-jade/40'
+              }`}
+            >
+              {estate}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="rounded-full border border-ink/20 bg-white px-4 py-1.5 text-sm text-inkSoft"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       <ListingsMap listings={visibleListings} onSelect={(l) => navigate(`/listings/${l.id}`)} />
@@ -143,9 +188,9 @@ export default function Home() {
 
       {status === 'success' && visibleListings.length === 0 && (
         <div className="py-16 text-center">
-          <p className="font-display text-lg text-ink">No listings here yet</p>
+          <p className="font-display text-lg text-ink">No listings match right now</p>
           <p className="mt-2 text-sm text-inkSoft">
-            We are adding areas one at a time. Check back soon, or try another estate or constituency above.
+            Try a different search term, constituency, or estate above.
           </p>
         </div>
       )}
